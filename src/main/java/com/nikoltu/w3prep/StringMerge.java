@@ -110,7 +110,7 @@ public final class StringMerge {
 			} else if (!line.startsWith("//") && !line.startsWith(";") && (line.indexOf('=') > 0)) {
 				final int equals = line.indexOf('=');
 				values.putIfAbsent(section + "\n" + line.substring(0, equals).trim().toLowerCase(Locale.ROOT),
-						raw.substring(raw.indexOf('=') + 1).replaceAll("\\s+$", ""));
+						undoDoubleEncoding(raw.substring(raw.indexOf('=') + 1).replaceAll("\\s+$", "")));
 			}
 		}
 		return values;
@@ -121,10 +121,35 @@ public final class StringMerge {
 		for (final String raw : text.split("\r?\n")) {
 			final Matcher matcher = FDF_STRING.matcher(raw);
 			if (matcher.matches()) {
-				values.putIfAbsent(matcher.group(3).toLowerCase(Locale.ROOT), matcher.group(6));
+				values.putIfAbsent(matcher.group(3).toLowerCase(Locale.ROOT), undoDoubleEncoding(matcher.group(6)));
 			}
 		}
 		return values;
+	}
+
+	/**
+	 * A few old values were saved as UTF-8 twice (an esES hotkey "ñ" reads "Ã±"). Such a value is all Latin-1
+	 * characters whose bytes are valid UTF-8 again; ordinary text with accents never is.
+	 */
+	static String undoDoubleEncoding(final String value) {
+		boolean suspicious = false;
+		for (int i = 0; i < value.length(); i++) {
+			final char c = value.charAt(i);
+			if (c > 0xFF) {
+				return value;
+			}
+			suspicious |= (c >= 0xC2) && (c <= 0xF4) && ((i + 1) < value.length()) && (value.charAt(i + 1) >= 0x80)
+					&& (value.charAt(i + 1) <= 0xBF);
+		}
+		if (!suspicious) {
+			return value;
+		}
+		try {
+			return StandardCharsets.UTF_8.newDecoder()
+					.decode(java.nio.ByteBuffer.wrap(value.getBytes(StandardCharsets.ISO_8859_1))).toString();
+		} catch (final java.nio.charset.CharacterCodingException e) {
+			return value;
+		}
 	}
 
 	private static boolean hasBom(final byte[] bytes) {

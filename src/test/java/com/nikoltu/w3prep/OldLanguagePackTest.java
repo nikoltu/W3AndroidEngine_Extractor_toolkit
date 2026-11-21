@@ -80,6 +80,19 @@ class OldLanguagePackTest {
 	}
 
 	@Test
+	void valuesSavedAsUtf8TwiceAreRepairedAndOthersKept() {
+		assertEquals("ñ", StringMerge.undoDoubleEncoding("Ã±"));
+		assertEquals("¿Qué pasó?", StringMerge.undoDoubleEncoding("¿Qué pasó?"));
+		assertEquals("Pequeño Árbol", StringMerge.undoDoubleEncoding("Pequeño Árbol"));
+		assertEquals("Пехота", StringMerge.undoDoubleEncoding("Пехота"));
+		final String current = "[nxyz]\nHotkey=N\n";
+		final String old = "[nxyz]\nHotkey=Ã±\n";
+		assertEquals("[nxyz]\nHotkey=ñ\n", new String(StringMerge.merge("units\\campaignunitstrings.txt",
+				current.getBytes(StandardCharsets.UTF_8), old.getBytes(StandardCharsets.UTF_8)).getText(),
+				StandardCharsets.UTF_8));
+	}
+
+	@Test
 	void fdfStringsTakeTheOldValue() {
 		final String current = "StringList {\n    OK      \"OK\",\n    NEW     \"New\",\n    QUIT \"Quit\", // menu\n}\n";
 		final String old = "StringList {\n    OK \"Aceptar\",\n    QUIT \"Salir\",\n}\n";

@@ -83,10 +83,10 @@ Get the file for your system from the [latest release](https://github.com/nikolt
 
 | System | File | Start |
 | --- | --- | --- |
-| Windows 10 / 11, 64-bit | `Reforged-Extractor-0.4.0-windows-x64.zip` | `Reforged-Extractor.exe` |
-| macOS, Apple Silicon | `Reforged-Extractor-0.4.0-macos-arm64.zip` | `Reforged-Extractor.app` |
-| Linux, x64 | `Reforged-Extractor-0.4.0-linux-x64.tar.gz` | `Reforged-Extractor/bin/Reforged-Extractor` |
-| Any system with Java 17+ | `reforged-extractor-0.4.0-all.jar` | `java -jar reforged-extractor-0.4.0-all.jar` |
+| Windows 10 / 11, 64-bit | `Reforged-Extractor-0.4.1-windows-x64.zip` | `Reforged-Extractor.exe` |
+| macOS, Apple Silicon | `Reforged-Extractor-0.4.1-macos-arm64.zip` | `Reforged-Extractor.app` |
+| Linux, x64 | `Reforged-Extractor-0.4.1-linux-x64.tar.gz` | `Reforged-Extractor/bin/Reforged-Extractor` |
+| Any system with Java 17+ | `reforged-extractor-0.4.1-all.jar` | `java -jar reforged-extractor-0.4.1-all.jar` |
 
 Unpack it anywhere and start it.
 
@@ -101,7 +101,7 @@ Unpack it anywhere and start it.
   page, then choose **More info** → **Run anyway**.
 - **macOS:** the app is not notarized. Right-click `Reforged-Extractor.app` → **Open** → **Open**. Or, in Terminal:
   `xattr -dr com.apple.quarantine Reforged-Extractor.app`
-- **Linux:** `tar -xzf Reforged-Extractor-0.4.0-linux-x64.tar.gz && ./Reforged-Extractor/bin/Reforged-Extractor`
+- **Linux:** `tar -xzf Reforged-Extractor-0.4.1-linux-x64.tar.gz && ./Reforged-Extractor/bin/Reforged-Extractor`
 
 </details>
 
@@ -222,7 +222,7 @@ of **Language from an old game**; `--old-language` gives the old game's language
 
 `--dry-run` writes nothing. It lists what would be packed by folder and by layer, the language, and checks a
 sample of files, so the numbers can be compared with an earlier extraction. `--movie-width` picks a smaller copy of
-the movies for small screens. With the jar: `java -jar reforged-extractor-0.4.0-all.jar --cli …`
+the movies for small screens. With the jar: `java -jar reforged-extractor-0.4.1-all.jar --cli …`
 
 </details>
 
