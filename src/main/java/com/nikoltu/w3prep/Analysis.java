@@ -14,6 +14,8 @@ public final class Analysis implements AutoCloseable {
 	private final GameStorage storage;
 	private final PackPlanner planner;
 	private final Map<GraphicsSet, PackPlan> setPlans = new EnumMap<>(GraphicsSet.class);
+	private OldInstall oldInstall;
+	private OldLanguageStorage oldStorage;
 
 	public Analysis(final Path install, final GameStorage storage) throws IOException {
 		this.install = install;
@@ -87,8 +89,50 @@ public final class Analysis implements AutoCloseable {
 		return this.install;
 	}
 
-	public GameStorage getStorage() {
-		return this.storage;
+	/** The storage the packages are written from; it reads the old install too while one is attached. */
+	public synchronized GameStorage getStorage() {
+		return this.oldStorage == null ? this.storage : this.oldStorage;
+	}
+
+	/** Reads the old game in this folder for a language pack; replaces one attached before. */
+	public synchronized void attachOldInstall(final Path folder) throws PackException {
+		final OldInstall opened = OldInstall.open(folder);
+		detachOldInstall();
+		this.oldInstall = opened;
+		this.oldStorage = new OldLanguageStorage(this.storage, opened);
+	}
+
+	public synchronized void detachOldInstall() {
+		if (this.oldInstall != null) {
+			this.oldInstall.close();
+		}
+		this.oldInstall = null;
+		this.oldStorage = null;
+	}
+
+	/** The old game's language as config.txt names it ("esES"), or null without an old install or a name. */
+	public synchronized String getOldLanguage() {
+		return this.oldInstall == null ? null : this.oldInstall.language();
+	}
+
+	/** The old game's folder is only read, so no package may go into it. */
+	public void checkOutputOutsideOldGame(final Path output) throws PackException {
+		if ((this.oldInstall != null) && output.toAbsolutePath().normalize()
+				.startsWith(this.oldInstall.getFolder().toAbsolutePath().normalize())) {
+			throw new PackException(PackException.Kind.BAD_OUTPUT,
+					"The packages can't go into the old game's folder; it is only read. Pick another place.");
+		}
+	}
+
+	public synchronized Path getOldInstallFolder() {
+		return this.oldInstall == null ? null : this.oldInstall.getFolder();
+	}
+
+	public synchronized PackPlan planOldLanguage(final String language, final PackOptions options) throws PackException {
+		if (this.oldInstall == null) {
+			throw new PackException(PackException.Kind.OLD_INSTALL, "No old game was chosen.");
+		}
+		return this.planner.planOldLanguage(this.oldInstall, language, options);
 	}
 
 	public List<String> describeUnreadableNames() {
@@ -108,12 +152,25 @@ public final class Analysis implements AutoCloseable {
 		return PackPlanner.displayLocale(this.planner.getLocale());
 	}
 
+	/** The other languages this install has downloaded, as the packages name them ("esES"). */
+	public List<String> getDownloadedLanguages() {
+		final List<String> languages = new ArrayList<>();
+		for (final String language : this.planner.downloadedLanguages()) {
+			languages.add(PackPlanner.displayLocale(language));
+		}
+		return languages;
+	}
+
 	public String getVersion() {
 		return this.storage.getVersion();
 	}
 
 	public PackPlan planClassic(final PackOptions options) throws PackException {
 		return this.planner.planClassic(options);
+	}
+
+	public PackPlan planLanguage(final String language, final PackOptions options) throws PackException {
+		return this.planner.planLanguage(language, options);
 	}
 
 	public PackPlan planSet(final GraphicsSet set) {
@@ -129,11 +186,18 @@ public final class Analysis implements AutoCloseable {
 				plans.add(plan);
 			}
 		}
+		for (final String language : options.getLanguages()) {
+			plans.add(this.planner.planLanguage(language, options));
+		}
+		if (options.getOldLanguage() != null) {
+			plans.add(planOldLanguage(options.getOldLanguage(), options));
+		}
 		return plans;
 	}
 
 	@Override
 	public void close() throws IOException {
+		detachOldInstall();
 		this.storage.close();
 	}
 }

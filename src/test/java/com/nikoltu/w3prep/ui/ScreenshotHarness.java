@@ -36,13 +36,15 @@ public final class ScreenshotHarness {
 			ready.setSummary("Full Classic · 21 181 files · 1.77 GB · about 1 min · 184 GB free on C:");
 			return ready;
 		}, null);
-		shoot(out, "1a-advanced", 980, () -> {
+		shoot(out, "1a-advanced", 1480, () -> {
 			final ReadyScreen ready = new ReadyScreen();
 			ready.showFound(install, "3.0.1.24371", "enUS");
 			ready.setOutput(zip);
 			ready.setSizes("1.77 GB", "1.50 GB", "+1.00 GB");
 			ready.setSetAvailability(GraphicsSet.DE, true, "8.40 GB");
 			ready.setSetAvailability(GraphicsSet.HD, false, "");
+			ready.setLanguages(java.util.Collections.singletonMap("esES", "512 MB"), "enUS");
+			ready.setOldGame(Paths.get("D:\\Games\\Warcraft III 1.27"), "esES", "337 MB", null);
 			ready.setSummary("Full Classic · 21 181 files · 1.77 GB · about 1 min · 184 GB free on C:");
 			ready.setAdvancedOpen(true);
 			return ready;

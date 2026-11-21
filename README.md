@@ -38,12 +38,12 @@ flowchart LR
 
 | | |
 | --- | --- |
-| **Reads only** | Your game install is never changed. Nothing is decrypted or converted. |
+| **Reads only** | Your game install, and an old game you pick for its language, are never changed. Encrypted Reforged data is never decoded, and game files are copied as they are; only the string files of a language from an old game are merged key by key. |
 | **Only what is used** | Leaves out what Warsmash does not read: the Battle.net web client, Reforged shaders and particle effects, the Reforged campaigns and their in-engine cinematics, and the fonts of languages you don't use. |
 | **Offline** | No internet connection, no updates, no telemetry. |
 | **Checked** | Every file is checked against the install while reading, and the ZIP is read back and checked before you get it. |
 | **One file** | One ZIP copies to a device much faster than 21 000 small files. |
-| **Your language** | Uses the game language your install has downloaded; English when it is there. |
+| **Your language** | Uses the game language your install has downloaded; English when it is there. Other languages come as separate language packs (Advanced). |
 | **No installer** | Unpack and run. |
 
 ### What the package holds
@@ -65,6 +65,16 @@ The experimental graphics sets (Advanced) are separate packages:
 | `w3-data-set-hd.zip` | `_hd.w3mod/`: the Reforged (HD) set, plus the ~250 files of the DE set that Reforged graphics take when the HD set has none (`_de.w3mod/`, ~0.14 GB) | ~47.8 GB |
 | `w3-data-set-de.zip` | `_de.w3mod/`: the DE set, plus the one HD model the DE graphics take (`_hd.w3mod/`) | ~47.0 GB |
 
+So are the experimental language packs (Advanced). Both have their files in `_locales/<xx>.w3mod/` and the marker
+`w3-datapacker-language.txt`, and both go in with Import ZIP after the Classic package:
+
+| Package | Holds | Size |
+| --- | --- | --- |
+| `w3-data-lang-eses.zip` | Text and speech of another language the install has downloaded, from the Reforged storage | ~0.5 GB (esES) |
+| `w3-data-lang-eses-classic.zip` | The Classic package's text and speech in the language of an old game (before 1.30): its sounds, and the text merged key by key, so what the old game did not have stays in the Classic package's language | ~0.33 GB (esES 1.27) |
+
+Map text is not in either: the maps of 3.0.1 carry their own translations.
+
 ## How to use
 
 ### 1. Download
@@ -73,10 +83,10 @@ Get the file for your system from the [latest release](https://github.com/nikolt
 
 | System | File | Start |
 | --- | --- | --- |
-| Windows 10 / 11, 64-bit | `Reforged-Extractor-0.2.0-windows-x64.zip` | `Reforged-Extractor.exe` |
-| macOS, Apple Silicon | `Reforged-Extractor-0.2.0-macos-arm64.zip` | `Reforged-Extractor.app` |
-| Linux, x64 | `Reforged-Extractor-0.2.0-linux-x64.tar.gz` | `Reforged-Extractor/bin/Reforged-Extractor` |
-| Any system with Java 17+ | `reforged-extractor-0.2.0-all.jar` | `java -jar reforged-extractor-0.2.0-all.jar` |
+| Windows 10 / 11, 64-bit | `Reforged-Extractor-0.4.0-windows-x64.zip` | `Reforged-Extractor.exe` |
+| macOS, Apple Silicon | `Reforged-Extractor-0.4.0-macos-arm64.zip` | `Reforged-Extractor.app` |
+| Linux, x64 | `Reforged-Extractor-0.4.0-linux-x64.tar.gz` | `Reforged-Extractor/bin/Reforged-Extractor` |
+| Any system with Java 17+ | `reforged-extractor-0.4.0-all.jar` | `java -jar reforged-extractor-0.4.0-all.jar` |
 
 Unpack it anywhere and start it.
 
@@ -91,7 +101,7 @@ Unpack it anywhere and start it.
   page, then choose **More info** → **Run anyway**.
 - **macOS:** the app is not notarized. Right-click `Reforged-Extractor.app` → **Open** → **Open**. Or, in Terminal:
   `xattr -dr com.apple.quarantine Reforged-Extractor.app`
-- **Linux:** `tar -xzf Reforged-Extractor-0.2.0-linux-x64.tar.gz && ./Reforged-Extractor/bin/Reforged-Extractor`
+- **Linux:** `tar -xzf Reforged-Extractor-0.4.0-linux-x64.tar.gz && ./Reforged-Extractor/bin/Reforged-Extractor`
 
 </details>
 
@@ -150,14 +160,16 @@ folder. The tool replaces only a folder it made itself.
 <summary><b>Advanced options</b></summary>
 
 <br>
-<img src="docs/advanced.png" alt="Advanced panel: content, experimental graphics sets, desktop build" width="60%">
+<img src="docs/advanced.png" alt="Advanced panel: content, experimental graphics sets, language packs and language from an old game, desktop build" width="60%">
 
 | Option | What it does |
 | --- | --- |
 | **Melee only** | Leaves out the campaign maps, campaign assets, their spoken lines and mission pictures. |
 | **Include movies** | Adds the campaign opening and ending movies, 1920 pixels wide, with sound and captions. Warsmash plays them on Android. |
 | **Graphics sets** *(experimental)* | DE and HD sets, each as its own ZIP (`w3-data-set-de.zip`, `w3-data-set-hd.zip`). Import the Classic package first, then the set's ZIP with Import ZIP too: Warsmash adds the set next to Classic, and a later Classic import keeps it. The set's files go into their own subfolder and don't overwrite Classic. Warsmash takes from them only models and textures that Classic lacks. |
-| **Desktop build** | See above. |
+| **Language packs** *(experimental)* | Another language your install has downloaded (choose it in the game launcher's settings for Warcraft III first), each as its own ZIP (`w3-data-lang-eses.zip`): the text and speech in `_locales/eses.w3mod/`. A Chinese, Korean or Japanese pack also brings its fonts. Import it with Import ZIP after the Classic package; Options › Game Data then offers the language, and a later Classic import keeps it. A pack whose speech was not downloaded holds the text only, and the speech stays in the Classic package's language. |
+| **Language from an old game** *(experimental)* | For the Classic package in the language of a Warcraft III from before 1.30 (1.27 and older keep their files in `war3.mpq` and its sibling archives). Pick that game's folder: the tool reads its language from `config.txt` and makes `w3-data-lang-eses-classic.zip` with the old speech and the Classic package's text, translated key by key from the old game. What the old game did not have yet stays in the Classic package's language: units, abilities and lines added later, newer menus, and everything of the Reforged campaigns. The old folder is only read. Import the ZIP with Import ZIP after the Classic package, like a language pack. |
+| **Desktop build** | See above. Language packs go into the same folder. |
 
 Next to each ZIP the tool writes a `.manifest.json` with every file's size and checksums. It stays on the PC.
 
@@ -173,10 +185,17 @@ Next to each ZIP the tool writes a `.manifest.json` with every file's size and c
 | Files could not be read | Let the game launcher finish updating, or run its Scan and Repair, then try again. |
 | The game was updated while packing | Let the update finish, then press **Try again**. |
 | Not enough space | Choose another place for the package, or free some space. |
+| The … text is not downloaded in this install | Choose that language in the game launcher's settings for Warcraft III, let it download, then run again. |
+| This folder has no war3.mpq | For **Language from an old game**, pick the folder of the old game that contains `war3.mpq`. |
+| This is a game of version 1.30 or newer | 1.30 and 1.31 store their files like Reforged and are not read as an old game yet. Use a game from before 1.30. |
+| The old game's config.txt does not name its language | Run the command line with `--old-language <code>`, such as `--old-language esES`. |
+| The packages can't go into the old game's folder | Choose another place for the packages. |
+| Warsmash: no campaign maps, was it prepared with Melee only? | Expected for a **Melee only** package. For the campaigns, make the package without Melee only and import it. |
 | Warsmash: not a ZIP file, incomplete, or does not match its checksum | The copy is damaged. Copy the ZIP to the device again and import it again. |
 | Warsmash: not enough free space | Free the space it names on the device, then import again. |
 | Warsmash: not a Reforged Extractor toolkit package | A ZIP not made by this toolkit was picked. Import `w3-data-classic.zip`. |
 | Warsmash: graphics set, import Classic first | A set ZIP was imported before Classic. Import `w3-data-classic.zip`, then the set. |
+| Warsmash: language pack, import Classic first | A language ZIP was imported before Classic. Import `w3-data-classic.zip`, then the language. |
 | Warsmash: the ZIP cannot be read where it lies | Copy it to the device storage, such as **Download**, and pick it there. |
 | Warsmash says a chosen folder is not valid (Change…) | Pick the folder that directly contains `units` and `ui`. |
 | Warsmash shows no exact game version | The package was made before version 0.2.0 of this tool; make it again. |
@@ -193,12 +212,17 @@ Settings and logs are kept in `Reforged-Extractor` in your user's application da
 
 ```
 Reforged-Extractor-cli [--install <folder>] [--out <folder>] [--melee] [--movies] [--movie-width 1920|1280|640]
-                       [--set de|hd] [--desktop-folder] [--dry-run] [--allow-missing] [--send]
+                       [--set de|hd] [--language <code>] [--old-game <folder> [--old-language <code>]]
+                       [--desktop-folder] [--dry-run] [--allow-missing] [--send]
 ```
+
+`--language esES` also makes the language pack `w3-data-lang-eses.zip` (see **Language packs** above); the run lists
+the other languages the install has downloaded (`also downloaded: …`). `--old-game <folder>` also makes the pack
+of **Language from an old game**; `--old-language` gives the old game's language when its `config.txt` names none.
 
 `--dry-run` writes nothing. It lists what would be packed by folder and by layer, the language, and checks a
 sample of files, so the numbers can be compared with an earlier extraction. `--movie-width` picks a smaller copy of
-the movies for small screens. With the jar: `java -jar reforged-extractor-0.2.0-all.jar --cli …`
+the movies for small screens. With the jar: `java -jar reforged-extractor-0.4.0-all.jar --cli …`
 
 </details>
 
@@ -230,6 +254,8 @@ self-extracting step. Pushing a `v*` tag builds Windows, macOS and Linux package
   only to say which game install the tool reads.
 - This repository and its releases contain code only, no game files. The tool reads a local install and does not
   download anything from any server.
-- The tool does not bypass any protection: encrypted data is never decoded, and the code holds no keys.
-- Licensed under [AGPL-3.0](LICENSE). The CASC reader in `com.hiveworkshop` comes from the
+- The tool does not bypass any protection: encrypted Reforged data is never decoded, and the code holds no keys.
+  The old MPQ archives are read the way every MPQ reader does, including the format's standard table scrambling.
+- Licensed under [AGPL-3.0](LICENSE). The CASC reader in `com.hiveworkshop` and the MPQ reader in
+  `com.nikoltu.w3prep.mpq` come from the
   [Warsmash](https://github.com/Retera/WarsmashModEngine) engine by Retera and contributors, under the same licence.

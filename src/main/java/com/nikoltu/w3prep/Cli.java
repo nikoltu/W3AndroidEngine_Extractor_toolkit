@@ -7,6 +7,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TreeSet;
 
 public final class Cli {
 	private Cli() {
@@ -20,6 +21,10 @@ public final class Cli {
 			"  --movies             include the movies, one width (default 1920)",
 			"  --movie-width <w>    movie width: 1920, 1280 or 640 (implies --movies)",
 			"  --set de|hd          also make a graphics set package (experimental)",
+			"  --language <code>    also make a language pack, such as esES, of a language the install has downloaded",
+			"  --old-game <folder>  also make a language pack from an old game (before 1.30) in its language, for the",
+			"                       Classic package: its sounds and its text merged key by key (experimental)",
+			"  --old-language <code> the old game's language when its config.txt does not name it",
 			"  --desktop-folder     also write a plain folder and warsmash-data.ini for desktop Warsmash",
 			"  --dry-run            show what would be packed, write nothing",
 			"  --allow-missing      make the package even if some files can't be read",
@@ -74,6 +79,9 @@ public final class Cli {
 		boolean send = false;
 		boolean allowMissing = false;
 		final Set<GraphicsSet> sets = EnumSet.noneOf(GraphicsSet.class);
+		final Set<String> languages = new TreeSet<>();
+		Path oldGame = null;
+		String oldLanguage = null;
 		try {
 			for (int i = 0; i < args.length; i++) {
 				switch (args[i]) {
@@ -100,6 +108,22 @@ public final class Cli {
 					break;
 				case "--set":
 					sets.add(GraphicsSet.valueOf(args[++i].toUpperCase(Locale.ROOT)));
+					break;
+				case "--language":
+					final String language = args[++i];
+					if (!language.matches("[A-Za-z]{4}")) {
+						throw new IllegalArgumentException("language " + language);
+					}
+					languages.add(language);
+					break;
+				case "--old-game":
+					oldGame = Paths.get(args[++i]);
+					break;
+				case "--old-language":
+					oldLanguage = args[++i];
+					if (!oldLanguage.matches("[A-Za-z]{4}")) {
+						throw new IllegalArgumentException("language " + oldLanguage);
+					}
 					break;
 				case "--desktop-folder":
 					desktopFolder = true;
@@ -130,7 +154,8 @@ public final class Cli {
 
 		final AppLog log = AppLog.open(true);
 		final Settings settings = Settings.load();
-		final PackOptions options = new PackOptions(content, movies, movieWidth, sets, desktopFolder);
+		PackOptions options = new PackOptions(content, movies, movieWidth, sets, desktopFolder)
+				.withLanguages(languages);
 		try {
 			final Path folder = install != null ? GameInstall.resolve(install)
 					: GameInstall.locate(settings.getInstallFolder());
@@ -140,10 +165,24 @@ public final class Cli {
 			}
 			log.info("install " + folder);
 			try (Analysis analysis = Analysis.open(folder)) {
+				if (oldGame != null) {
+					analysis.attachOldInstall(oldGame);
+					final String language = oldLanguage != null ? oldLanguage : analysis.getOldLanguage();
+					if (language == null) {
+						log.info("The old game's config.txt does not name its language. Give it with --old-language.");
+						return 5;
+					}
+					log.info("old game " + oldGame + " · language " + language);
+					options = options.withOldLanguage(language);
+				}
 				final List<PackPlan> plans = analysis.plans(options);
 				long bytes = 0;
 				int files = 0;
 				log.info("game version " + analysis.getVersion() + " · language " + analysis.getLocale());
+				if (!analysis.getDownloadedLanguages().isEmpty()) {
+					log.info("also downloaded: " + String.join(", ", analysis.getDownloadedLanguages())
+							+ " (--language makes a language pack)");
+				}
 				for (final String line : analysis.describeUnreadableNames()) {
 					log.info(line);
 				}
@@ -172,6 +211,7 @@ public final class Cli {
 					return 0;
 				}
 				final Path outputFolder = out != null ? out : GameInstall.defaultOutputFolder();
+				analysis.checkOutputOutsideOldGame(outputFolder);
 				final Progress progress = new Progress(bytes, files, desktopFolder);
 				final Thread reporter = startReporter(progress);
 				final Packer.Outcome outcome;

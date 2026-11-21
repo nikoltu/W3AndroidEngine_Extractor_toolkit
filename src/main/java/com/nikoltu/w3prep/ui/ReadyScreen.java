@@ -2,10 +2,15 @@ package com.nikoltu.w3prep.ui;
 
 import java.awt.BorderLayout;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
@@ -33,6 +38,7 @@ final class ReadyScreen extends JPanel {
 	final JButton changeOutputButton = Ui.button("Change…");
 	final JButton advancedButton = Ui.link("Advanced", new Glyph(Glyph.Shape.CHEVRON_RIGHT, 12, Theme.GOLD_HI));
 	final JButton createButton = Ui.primary("Create Android package");
+	final JButton chooseOldGameButton = Ui.button("Choose…");
 
 	private final JLabel title = Ui.title("Ready to make the Android package");
 	private final WrapText subtitle = Ui.sub("");
@@ -52,6 +58,15 @@ final class ReadyScreen extends JPanel {
 	private final JCheckBox movies = new JCheckBox("Include movies");
 	private final Map<GraphicsSet, JCheckBox> setBoxes = new EnumMap<>(GraphicsSet.class);
 	private final Map<GraphicsSet, OptionRow> setRows = new EnumMap<>(GraphicsSet.class);
+	private final JPanel languageRows = Ui.column(8);
+	private final Map<String, JCheckBox> languageBoxes = new LinkedHashMap<>();
+	private final JTextField oldGameField = Ui.pathField("Old game folder");
+	private final JCheckBox oldGameBox = new JCheckBox("Language of the old game");
+	private final OptionRow oldGameRow = new OptionRow(this.oldGameBox, "", false);
+	private final JPanel oldGameError = Ui.column(0);
+	private String oldLanguage;
+	private Runnable optionsListener = () -> {
+	};
 	private final JCheckBox desktopFolder = new JCheckBox("Also write a plain folder and warsmash-data.ini");
 	private final OptionRow fullRow;
 	private final OptionRow meleeRow;
@@ -106,6 +121,20 @@ final class ReadyScreen extends JPanel {
 			setGroup.add(row);
 		}
 		this.advancedPanel.add(setGroup);
+
+		final JPanel languageGroup = Ui.column(8);
+		languageGroup.add(Ui.row(8, Ui.heading("Language packs"), Ui.tag("EXPERIMENTAL", Theme.WARN_BG, Theme.WARN)));
+		languageGroup.add(this.languageRows);
+		this.advancedPanel.add(languageGroup);
+		setLanguages(Collections.emptyMap(), "");
+
+		final JPanel oldGroup = Ui.column(8);
+		oldGroup.add(Ui.row(8, Ui.heading("Language from an old game"), Ui.tag("EXPERIMENTAL", Theme.WARN_BG, Theme.WARN)));
+		oldGroup.add(Ui.fieldRow(this.oldGameField, this.chooseOldGameButton));
+		oldGroup.add(this.oldGameError);
+		oldGroup.add(this.oldGameRow);
+		this.advancedPanel.add(oldGroup);
+		setOldGame(null, null, null, null);
 
 		final JPanel desktopGroup = Ui.column(8);
 		desktopGroup.add(Ui.heading("Desktop build"));
@@ -248,6 +277,70 @@ final class ReadyScreen extends JPanel {
 				: "Not on this install.");
 	}
 
+	/**
+	 * @param sizes the other languages the install has downloaded ("esES") with the size of each pack
+	 * @param base  the language of the Classic package
+	 */
+	void setLanguages(final Map<String, String> sizes, final String base) {
+		final Set<String> chosen = new HashSet<>();
+		for (final Map.Entry<String, JCheckBox> box : this.languageBoxes.entrySet()) {
+			if (box.getValue().isSelected()) {
+				chosen.add(box.getKey());
+			}
+		}
+		this.languageBoxes.clear();
+		this.languageRows.removeAll();
+		if (sizes.isEmpty()) {
+			final JCheckBox none = new JCheckBox("No other language");
+			final OptionRow row = new OptionRow(none, "The install has only " + (base.isEmpty() ? "one language" : base)
+					+ ". To add one, choose it in the game launcher's settings for Warcraft III and let it download.",
+					false);
+			row.setEnabled(false);
+			row.setSize("–");
+			this.languageRows.add(row);
+		}
+		for (final Map.Entry<String, String> language : sizes.entrySet()) {
+			final JCheckBox box = new JCheckBox(language.getKey());
+			box.setSelected(chosen.contains(language.getKey()));
+			box.addActionListener(e -> this.optionsListener.run());
+			final OptionRow row = new OptionRow(box, "Separate package w3-data-lang-"
+					+ language.getKey().toLowerCase(Locale.ROOT)
+					+ ".zip. Import it with Import ZIP after the Classic package; Options › Game Data then offers the language.",
+					false);
+			row.setSize(language.getValue());
+			this.languageBoxes.put(language.getKey(), box);
+			this.languageRows.add(row);
+		}
+		refresh();
+	}
+
+	/**
+	 * @param folder   the old game picked, or null
+	 * @param language its language ("esES"), or null when it can't be used
+	 * @param size     the size of its pack
+	 * @param error    why it can't be used, or null
+	 */
+	void setOldGame(final Path folder, final String language, final String size, final String error) {
+		this.oldGameField.setText(folder == null ? "" : folder.toString());
+		this.oldLanguage = language;
+		this.oldGameError.removeAll();
+		if (error != null) {
+			this.oldGameError.add(Ui.notice(error, Theme.ERR_BG, Theme.ERR));
+		}
+		final boolean usable = language != null;
+		this.oldGameBox.setText(usable ? language + " from the old game" : "Language of the old game");
+		this.oldGameBox.setSelected(usable && this.oldGameBox.isSelected());
+		this.oldGameRow.setEnabled(usable);
+		this.oldGameRow.setSize(usable ? size : "–");
+		this.oldGameRow.setDescription(usable
+				? "Separate package w3-data-lang-" + language.toLowerCase(Locale.ROOT) + "-classic.zip with the old "
+						+ "game's speech and text for the Classic package. What the old game did not have yet (later units, "
+						+ "lines and menus) stays in the Classic package's language. Import it with Import ZIP after the "
+						+ "Classic package."
+				: "Pick a Warcraft III from before 1.30, the folder with war3.mpq, in another language. It is only read.");
+		refresh();
+	}
+
 	PackOptions readOptions() {
 		final Set<GraphicsSet> sets = EnumSet.noneOf(GraphicsSet.class);
 		for (final Map.Entry<GraphicsSet, JCheckBox> box : this.setBoxes.entrySet()) {
@@ -255,15 +348,25 @@ final class ReadyScreen extends JPanel {
 				sets.add(box.getKey());
 			}
 		}
+		final Set<String> languages = new TreeSet<>();
+		for (final Map.Entry<String, JCheckBox> box : this.languageBoxes.entrySet()) {
+			if (box.getValue().isSelected()) {
+				languages.add(box.getKey());
+			}
+		}
 		return new PackOptions(this.meleeOnly.isSelected() ? PackOptions.Content.MELEE_ONLY
-				: PackOptions.Content.FULL_CLASSIC, this.movies.isSelected(), sets, this.desktopFolder.isSelected());
+				: PackOptions.Content.FULL_CLASSIC, this.movies.isSelected(), sets, this.desktopFolder.isSelected())
+						.withLanguages(languages)
+						.withOldLanguage(this.oldGameBox.isSelected() && this.oldGameBox.isEnabled() ? this.oldLanguage : null);
 	}
 
 	void onOptionsChanged(final Runnable listener) {
+		this.optionsListener = listener;
 		this.fullClassic.addActionListener(e -> listener.run());
 		this.meleeOnly.addActionListener(e -> listener.run());
 		this.movies.addActionListener(e -> listener.run());
 		this.desktopFolder.addActionListener(e -> listener.run());
+		this.oldGameBox.addActionListener(e -> listener.run());
 		for (final JCheckBox box : this.setBoxes.values()) {
 			box.addActionListener(e -> listener.run());
 		}

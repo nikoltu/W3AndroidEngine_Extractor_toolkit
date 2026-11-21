@@ -21,6 +21,10 @@ public final class PackPlanner {
 	static final String DEFAULT_LOCALE = "enus";
 	static final String NOMEDIA = ".nomedia";
 	static final String MARKER = "w3-datapacker.txt";
+	/** The marker of a language pack, so the engine tells it from a Classic package. */
+	static final String LANGUAGE_MARKER = "w3-datapacker-language.txt";
+	/** The file the engine finds a language folder by. */
+	private static final String LANGUAGE_TEXT = "ui\\worldeditgamestrings.txt";
 	private static final Set<String> AUDIO_EXTENSIONS = new HashSet<>(Arrays.asList("flac", "ogg", "mp3", "wav"));
 	private static final List<String> MENU_SCENES = Arrays.asList("mainmenu", "mainmenu_tft", "roc_prologue",
 			"roc_human", "roc_undead", "roc_orc", "roc_nightelf", "tft_nightelf", "tft_human", "tft_undead", "tft_orc");
@@ -394,6 +398,170 @@ public final class PackPlanner {
 		marker.append("locale=").append(displayLocale(this.locale)).append('\n');
 		marker.append("entries=").append(entryCount).append('\n');
 		return marker.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * The languages besides the one of the Classic package whose text this install has downloaded, as lower case codes
+	 * ("eses"), sorted. The game launcher downloads a language when it is chosen in the game's settings.
+	 */
+	public List<String> downloadedLanguages() {
+		final String prefix = ROOT + "\\_locales\\";
+		final Set<String> found = new HashSet<>();
+		for (final StorageEntry entry : this.entries) {
+			final String path = normalize(entry.getPath());
+			if (entry.isLocal() && path.startsWith(prefix) && path.endsWith("\\" + LANGUAGE_TEXT)) {
+				final String folder = firstSegment(path.substring(prefix.length()));
+				if (folder.endsWith(".w3mod") && path.equals(prefix + folder + "\\" + LANGUAGE_TEXT)) {
+					found.add(folder.substring(0, folder.length() - ".w3mod".length()));
+				}
+			}
+		}
+		found.remove(this.locale);
+		final List<String> sorted = new ArrayList<>(found);
+		Collections.sort(sorted);
+		return sorted;
+	}
+
+	/**
+	 * A language pack: the text and speech of one language in "_locales/xx.w3mod/", which the engine reads over the
+	 * Classic package's own language, file by file. Only the downloaded files go in, so a language whose speech was
+	 * not downloaded gives a pack with its text alone. A Korean, Chinese or Japanese pack for a package in another
+	 * language also carries the fonts the Classic package leaves out.
+	 */
+	public PackPlan planLanguage(final String code, final PackOptions options) throws PackException {
+		final String language = code.toLowerCase(Locale.ROOT);
+		final String folder = "_locales\\" + language + ".w3mod";
+		final String prefix = ROOT + "\\" + folder + "\\";
+		final String zipFolder = folder.replace('\\', '/') + "/";
+		final List<PlanEntry> planEntries = new ArrayList<>();
+		final List<String> skipped = new ArrayList<>();
+		final Set<String> packed = new HashSet<>();
+		boolean hasText = false;
+		boolean hasSpeech = false;
+		for (final StorageEntry entry : this.entries) {
+			final String path = normalize(entry.getPath());
+			if (!path.startsWith(prefix)) {
+				continue;
+			}
+			final String relative = path.substring(prefix.length());
+			if (relative.isEmpty() || isSubMod(firstSegment(relative)) || isExcluded(relative, options, language)) {
+				continue;
+			}
+			if (!entry.isLocal()) {
+				skipped.add(relative);
+				continue;
+			}
+			hasText |= relative.equals(LANGUAGE_TEXT);
+			hasSpeech |= relative.startsWith("sound\\");
+			packed.add(relative);
+			planEntries.add(new PlanEntry(zipFolder + relative.replace('\\', '/'), entry.getPath(), folder,
+					entry.getSize()));
+		}
+		if (!hasText) {
+			throw new PackException(PackException.Kind.LANGUAGE_NOT_DOWNLOADED, "The " + displayLocale(language)
+					+ " text is not downloaded in this install. Choose the language in the game launcher's "
+					+ "settings for Warcraft III, let it download, then try again.");
+		}
+		addCjkFonts(language, zipFolder, planEntries, packed);
+		planEntries.sort(Comparator.comparing(PlanEntry::getZipPath));
+		planEntries.add(PlanEntry.inline(LANGUAGE_MARKER,
+				languageMarkerText(language, options, hasSpeech, planEntries.size() + 1, null)));
+		Collections.sort(skipped);
+		return new PackPlan("w3-data-lang-" + language + ".zip", "Language " + displayLocale(language), planEntries,
+				skipped);
+	}
+
+	private void addCjkFonts(final String language, final String zipFolder, final List<PlanEntry> planEntries,
+			final Set<String> packed) {
+		if (!CJK_LOCALES.contains(language) || CJK_LOCALES.contains(this.locale)) {
+			return;
+		}
+		for (final StorageEntry entry : this.entries) {
+			final String path = normalize(entry.getPath());
+			final String fonts = ROOT + "\\fonts\\";
+			final String font = path.startsWith(fonts) ? path.substring(fonts.length()) : "";
+			if (CJK_FONTS.contains(font) && entry.isLocal() && packed.add("fonts\\" + font)) {
+				planEntries.add(new PlanEntry(zipFolder + "fonts/" + font, entry.getPath(), "root", entry.getSize()));
+			}
+		}
+	}
+
+	/**
+	 * A language pack from an old game (before 1.30) for the Classic package: for each file the package takes from
+	 * its own language, the old game's sound, or the string file with the old translation merged in key by key. What
+	 * the old game did not have (units and lines added later, the Reforged campaigns) stays in the package's language.
+	 * Read it through an {@link OldLanguageStorage} with the same old install.
+	 */
+	public PackPlan planOldLanguage(final OldFiles old, final String code, final PackOptions options)
+			throws PackException {
+		final String language = code.toLowerCase(Locale.ROOT);
+		if (language.equals(this.locale)) {
+			throw new PackException(PackException.Kind.OLD_INSTALL, "The old game is in " + displayLocale(language)
+					+ ", the language the Classic package has already.");
+		}
+		final String folder = "_locales\\" + language + ".w3mod";
+		final String zipFolder = folder.replace('\\', '/') + "/";
+		final String ownLayer = "_locales\\" + this.locale;
+		final List<PlanEntry> planEntries = new ArrayList<>();
+		final List<String> skipped = new ArrayList<>();
+		final Set<String> packed = new HashSet<>();
+		boolean hasText = false;
+		boolean hasSpeech = false;
+		for (final PlanEntry entry : planClassic(options).getEntries()) {
+			if (entry.isInline() || !ownLayer.equals(entry.getLayer())) {
+				continue;
+			}
+			final String relative = entry.getZipPath().replace('/', '\\');
+			final String extension = extension(relative);
+			if (AUDIO_EXTENSIONS.contains(extension)) {
+				final String sound = old.findSound(relative);
+				if (sound == null) {
+					skipped.add(relative);
+					continue;
+				}
+				final String name = relative.substring(0, relative.lastIndexOf('.'))
+						+ sound.substring(sound.lastIndexOf('.')).toLowerCase(Locale.ROOT);
+				hasSpeech = true;
+				packed.add(name);
+				planEntries.add(new PlanEntry(zipFolder + name.replace('\\', '/'), OldLanguageStorage.OLD + sound,
+						"old game", old.size(sound)));
+			} else if (("txt".equals(extension) || "fdf".equals(extension)) && old.has(relative)) {
+				hasText |= relative.equals(LANGUAGE_TEXT);
+				packed.add(relative);
+				planEntries.add(new PlanEntry(zipFolder + entry.getZipPath(),
+						OldLanguageStorage.mergedSource(entry.getSourcePath(), relative), "merged", entry.getSize()));
+			} else {
+				skipped.add(relative);
+			}
+		}
+		if (!hasText) {
+			throw new PackException(PackException.Kind.OLD_INSTALL,
+					"The old game has none of the text this tool merges (" + LANGUAGE_TEXT + " is missing).");
+		}
+		addCjkFonts(language, zipFolder, planEntries, packed);
+		planEntries.sort(Comparator.comparing(PlanEntry::getZipPath));
+		planEntries.add(PlanEntry.inline(LANGUAGE_MARKER,
+				languageMarkerText(language, options, hasSpeech, planEntries.size() + 1, "old game")));
+		Collections.sort(skipped);
+		return new PackPlan("w3-data-lang-" + language + "-classic.zip",
+				"Language " + displayLocale(language) + " from the old game", planEntries, skipped);
+	}
+
+	byte[] languageMarkerText(final String language, final PackOptions options, final boolean speech,
+			final int entryCount, final String source) {
+		final StringBuilder marker = new StringBuilder();
+		marker.append("tool=").append(AppInfo.NAME).append(' ').append(AppInfo.version()).append('\n');
+		if ((this.gameVersion != null) && !this.gameVersion.isEmpty() && !"unknown".equals(this.gameVersion)) {
+			marker.append("gameVersion=").append(this.gameVersion).append('\n');
+		}
+		marker.append("profile=").append(options.describe()).append('\n');
+		marker.append("locale=").append(displayLocale(language)).append('\n');
+		marker.append("speech=").append(speech ? "yes" : "no").append('\n');
+		if (source != null) {
+			marker.append("source=").append(source).append('\n');
+		}
+		marker.append("entries=").append(entryCount).append('\n');
+		return marker.toString().getBytes(StandardCharsets.UTF_8);
 	}
 
 	public PackPlan planSet(final GraphicsSet set) {

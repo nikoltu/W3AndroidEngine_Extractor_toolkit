@@ -3,7 +3,7 @@ plugins {
     id 'application'
 }
 
-def packerVersion = '0.2.0'
+def packerVersion = '0.4.0'
 def mainClassName = 'com.nikoltu.w3prep.Main'
 def launcherClassName = 'com.nikoltu.w3prep.Launcher'
 def appName = 'Reforged-Extractor'

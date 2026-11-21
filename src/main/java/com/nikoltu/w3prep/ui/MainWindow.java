@@ -16,7 +16,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
@@ -113,6 +115,7 @@ public final class MainWindow {
 		this.ready.helpButton.addActionListener(e -> openReadme());
 		this.ready.logButton.addActionListener(e -> openFolder(AppInfo.logFolder()));
 		this.ready.chooseInstallButton.addActionListener(e -> chooseInstall());
+		this.ready.chooseOldGameButton.addActionListener(e -> chooseOldGame());
 		this.ready.changeOutputButton.addActionListener(e -> chooseOutput());
 		this.ready.advancedButton.addActionListener(e -> toggleAdvanced());
 		this.ready.createButton.addActionListener(e -> startRun(false));
@@ -192,7 +195,53 @@ public final class MainWindow {
 		});
 	}
 
+	private void chooseOldGame() {
+		if (this.analysis == null) {
+			return;
+		}
+		final JFileChooser chooser = new JFileChooser();
+		chooser.setDialogTitle("Choose the folder of the old game (with war3.mpq)");
+		chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		if (this.analysis.getOldInstallFolder() != null) {
+			chooser.setCurrentDirectory(this.analysis.getOldInstallFolder().toFile());
+		}
+		if (chooser.showOpenDialog(this.frame) != JFileChooser.APPROVE_OPTION) {
+			return;
+		}
+		final Path picked = chooser.getSelectedFile().toPath();
+		final Analysis current = this.analysis;
+		runInBackground(() -> {
+			String language = null;
+			String size = null;
+			String error = null;
+			try {
+				current.attachOldInstall(picked);
+				language = current.getOldLanguage();
+				if (language == null) {
+					error = "The old game's config.txt does not name its language.";
+				} else {
+					size = Sizes.format(current.planOldLanguage(language, PackOptions.defaults()).getTotalBytes());
+				}
+			} catch (final PackException e) {
+				current.detachOldInstall();
+				error = e.getMessage();
+				language = null;
+			}
+			this.log.info("old game " + picked + ": " + (error == null ? "language " + language + ", " + size : error));
+			final String shownLanguage = language;
+			final String shownSize = size;
+			final String shownError = error;
+			SwingUtilities.invokeLater(() -> {
+				if (this.analysis == current) {
+					this.ready.setOldGame(picked, shownLanguage, shownSize, shownError);
+					updateSummary();
+				}
+			});
+		});
+	}
+
 	private void closeAnalysis() {
+		this.ready.setOldGame(null, null, null, null);
 		if (this.analysis != null) {
 			try {
 				this.analysis.close();
@@ -233,6 +282,16 @@ public final class MainWindow {
 			final PackPlan plan = this.analysis.planSet(set);
 			this.ready.setSetAvailability(set, plan.getFileCount() > 0, Sizes.format(plan.getTotalBytes()));
 		}
+		final Map<String, String> languages = new LinkedHashMap<>();
+		for (final String language : this.analysis.getDownloadedLanguages()) {
+			try {
+				languages.put(language,
+						Sizes.format(this.analysis.planLanguage(language, PackOptions.defaults()).getTotalBytes()));
+			} catch (final PackException e) {
+				// Listed by its text file, so a pack can always be planned; one that can't is not offered.
+			}
+		}
+		this.ready.setLanguages(languages, this.analysis.getLocale());
 	}
 
 	private void updateSummary() {
@@ -302,6 +361,7 @@ public final class MainWindow {
 			}
 			GameInstall.checkOutput(this.outputFolder, this.analysis.getInstall(),
 					options.isDesktopFolder() ? bytes * 2 : bytes);
+			this.analysis.checkOutputOutsideOldGame(this.outputFolder);
 		} catch (final PackException e) {
 			show(READY);
 			this.ready.setPackageError(e.getMessage());

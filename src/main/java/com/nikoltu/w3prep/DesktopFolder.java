@@ -79,6 +79,10 @@ public final class DesktopFolder {
 						Files.createDirectories(target);
 						continue;
 					}
+					// The Classic marker names the folder; a language pack's marker only describes its zip.
+					if (entry.getName().equals(PackPlanner.LANGUAGE_MARKER)) {
+						continue;
+					}
 					Files.createDirectories(target.getParent());
 					try (InputStream in = zip.getInputStream(entry); OutputStream out = Files.newOutputStream(target)) {
 						int read;

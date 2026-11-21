@@ -4,7 +4,8 @@ public final class PackException extends Exception {
 	private static final long serialVersionUID = 1L;
 
 	public enum Kind {
-		NOT_AN_INSTALL, UNKNOWN_FORMAT, NO_CLASSIC_FILES, NOT_ENOUGH_SPACE, BAD_OUTPUT, GAME_CHANGED, WRITE_FAILED
+		NOT_AN_INSTALL, UNKNOWN_FORMAT, NO_CLASSIC_FILES, NOT_ENOUGH_SPACE, BAD_OUTPUT, GAME_CHANGED, WRITE_FAILED, LANGUAGE_NOT_DOWNLOADED,
+		OLD_INSTALL
 	}
 
 	private final Kind kind;

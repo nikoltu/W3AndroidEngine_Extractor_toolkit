@@ -3,6 +3,7 @@ package com.nikoltu.w3prep;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 public final class PackOptions {
 	public enum Content {
@@ -18,6 +19,10 @@ public final class PackOptions {
 	private final int movieWidth;
 	private final Set<GraphicsSet> sets;
 	private final boolean desktopFolder;
+	/** Lower case codes ("eses") of the languages that get a language pack of their own. */
+	private final Set<String> languages;
+	/** Lower case code of the old game's language that gets a pack from an old install, or null. */
+	private final String oldLanguage;
 
 	public PackOptions(final Content content, final boolean movies, final Set<GraphicsSet> sets,
 			final boolean desktopFolder) {
@@ -26,6 +31,12 @@ public final class PackOptions {
 
 	public PackOptions(final Content content, final boolean movies, final int movieWidth,
 			final Set<GraphicsSet> sets, final boolean desktopFolder) {
+		this(content, movies, movieWidth, sets, desktopFolder, Collections.emptySet(), null);
+	}
+
+	private PackOptions(final Content content, final boolean movies, final int movieWidth,
+			final Set<GraphicsSet> sets, final boolean desktopFolder, final Set<String> languages,
+			final String oldLanguage) {
 		if (!isMovieWidth(movieWidth)) {
 			throw new IllegalArgumentException("movie width " + movieWidth);
 		}
@@ -34,6 +45,24 @@ public final class PackOptions {
 		this.movieWidth = movieWidth;
 		this.sets = sets.isEmpty() ? Collections.emptySet() : Collections.unmodifiableSet(EnumSet.copyOf(sets));
 		this.desktopFolder = desktopFolder;
+		this.languages = languages.isEmpty() ? Collections.emptySet()
+				: Collections.unmodifiableSet(new TreeSet<>(languages));
+		this.oldLanguage = oldLanguage == null ? null : oldLanguage.toLowerCase(java.util.Locale.ROOT);
+	}
+
+	public PackOptions withLanguages(final Set<String> codes) {
+		final Set<String> lower = new TreeSet<>();
+		for (final String code : codes) {
+			lower.add(code.toLowerCase(java.util.Locale.ROOT));
+		}
+		return new PackOptions(this.content, this.movies, this.movieWidth, this.sets, this.desktopFolder, lower,
+				this.oldLanguage);
+	}
+
+	/** A language pack from the old install in this language ("esES"), or none for null. */
+	public PackOptions withOldLanguage(final String code) {
+		return new PackOptions(this.content, this.movies, this.movieWidth, this.sets, this.desktopFolder,
+				this.languages, code);
 	}
 
 	public static PackOptions defaults() {
@@ -63,6 +92,14 @@ public final class PackOptions {
 
 	public Set<GraphicsSet> getSets() {
 		return this.sets;
+	}
+
+	public Set<String> getLanguages() {
+		return this.languages;
+	}
+
+	public String getOldLanguage() {
+		return this.oldLanguage;
 	}
 
 	public boolean isDesktopFolder() {
